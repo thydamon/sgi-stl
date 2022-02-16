@@ -32,7 +32,7 @@
 #include <iostream.h>
 #include <algobase.h>
 
-
+// defalloc只是对operator new和operator delete的简单的封装，效率不高所以不建议使用
 template <class T>
 inline T* allocate(ptrdiff_t size, T*) {
     set_new_handler(0);
