@@ -50,7 +50,9 @@ template <class T> inline void copy(T* source,T* destination,int n) {
 }
 */
 
-
+// 萃取技术
+// 特化内置类型为__true_type类型，反之其他带有构造函数的则为__false_type
+// 萃取技术实际上是利用了编译器对于特化模板的自动推导功能
 struct __true_type {
 };
 

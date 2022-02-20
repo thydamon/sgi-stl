@@ -131,11 +131,12 @@ __STL_BEGIN_NAMESPACE
 # endif
 #endif
 
+// 第一级适配器
 template <int inst>
 class __malloc_alloc_template {
 
 private:
-
+// 以下都是函数指针,用来处理内存不足的情况
 static void *oom_malloc(size_t);
 
 static void *oom_realloc(void *, size_t);
@@ -148,23 +149,29 @@ public:
 
 static void * allocate(size_t n)
 {
+    // 第一级分配器直接使用malloc函数
     void *result = malloc(n);
+    // 内存不足时使用oom_malloc
     if (0 == result) result = oom_malloc(n);
     return result;
 }
 
 static void deallocate(void *p, size_t /* n */)
 {
+    // 第一级分配器直接使用free函数
     free(p);
 }
 
 static void * reallocate(void *p, size_t /* old_sz */, size_t new_sz)
 {
+    // 第一级分配器直接使用realloc
     void * result = realloc(p, new_sz);
+    // 内存不足时使用oom_realloc
     if (0 == result) result = oom_realloc(p, new_sz);
     return result;
 }
 
+// 自定义out-of-memory handler
 static void (* set_malloc_handler(void (*f)()))()
 {
     void (* old)() = __malloc_alloc_oom_handler;
@@ -177,6 +184,7 @@ static void (* set_malloc_handler(void (*f)()))()
 // malloc_alloc out-of-memory handling
 
 #ifndef __STL_STATIC_TEMPLATE_MEMBER_BUG
+// 初始值为0,待用户设定
 template <int inst>
 void (* __malloc_alloc_template<inst>::__malloc_alloc_oom_handler)() = 0;
 #endif
@@ -187,10 +195,11 @@ void * __malloc_alloc_template<inst>::oom_malloc(size_t n)
     void (* my_malloc_handler)();
     void *result;
 
+    // 不断尝试分配释放
     for (;;) {
         my_malloc_handler = __malloc_alloc_oom_handler;
         if (0 == my_malloc_handler) { __THROW_BAD_ALLOC; }
-        (*my_malloc_handler)();
+        (*my_malloc_handler)();  // 调用异常处理函数
         result = malloc(n);
         if (result) return(result);
     }
@@ -202,10 +211,11 @@ void * __malloc_alloc_template<inst>::oom_realloc(void *p, size_t n)
     void (* my_malloc_handler)();
     void *result;
 
+    // 不断尝试分配释放
     for (;;) {
         my_malloc_handler = __malloc_alloc_oom_handler;
         if (0 == my_malloc_handler) { __THROW_BAD_ALLOC; }
-        (*my_malloc_handler)();
+        (*my_malloc_handler)();  // 调用异常处理函数
         result = realloc(p, n);
         if (result) return(result);
     }
@@ -213,6 +223,7 @@ void * __malloc_alloc_template<inst>::oom_realloc(void *p, size_t n)
 
 typedef __malloc_alloc_template<0> malloc_alloc;
 
+// 使分配器的接口符合STL规范,内部四个成员函数单纯是转调用
 template<class T, class Alloc>
 class simple_alloc {
 
@@ -273,8 +284,8 @@ static void * reallocate(void *p, size_t old_sz, size_t new_sz)
 
 # ifdef __USE_MALLOC
 
-typedef malloc_alloc alloc;
-typedef malloc_alloc single_client_alloc;
+typedef malloc_alloc alloc;  // 第一级分配器
+typedef malloc_alloc single_client_alloc; 
 
 # else
 
@@ -437,8 +448,8 @@ public:
 
 } ;
 
-typedef __default_alloc_template<__NODE_ALLOCATOR_THREADS, 0> alloc;
-typedef __default_alloc_template<false, 0> single_client_alloc;
+typedef __default_alloc_template<__NODE_ALLOCATOR_THREADS, 0> alloc; // 第二级配置器(默认),内存块打印128byte转而调用第一级适配器
+typedef __default_alloc_template<false, 0> single_client_alloc;  
 
 
 

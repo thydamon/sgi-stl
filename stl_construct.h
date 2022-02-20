@@ -59,6 +59,7 @@ inline void __destroy_aux(ForwardIterator, ForwardIterator, __true_type) {}
 template <class ForwardIterator, class T>
 inline void __destroy(ForwardIterator first, ForwardIterator last, T*) {
   // __type_traits的功能是萃取出指针的类型
+  // 通过萃取技术判断是否包含构造函数和析构函数，以此提高效率
   typedef typename __type_traits<T>::has_trivial_destructor trivial_destructor;
   __destroy_aux(first, last, trivial_destructor());
 }
