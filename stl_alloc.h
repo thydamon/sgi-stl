@@ -413,9 +413,11 @@ public:
     obj * __VOLATILE * my_free_list;
     obj * __RESTRICT result;
 
+    // n大于128bytes就使用一级分配器,否则使用二级分配器
     if (n > (size_t) __MAX_BYTES) {
         return(malloc_alloc::allocate(n));
     }
+    // 在free_list数组中根据分配空间大小计算出标,向对应下标申请空间
     my_free_list = free_list + FREELIST_INDEX(n);
     // Acquire the lock here with a constructor call.
     // This ensures that it is released in exit or during stack
@@ -425,10 +427,12 @@ public:
         lock lock_instance;
 #       endif
     result = *my_free_list;
+    // 如果对应下标下没有可用的free list,给free list申请空间,并直接返回
     if (result == 0) {
         void *r = refill(ROUND_UP(n));
         return r;
     }
+    // 摘下对应下标下的节点返回，指针向后移动一个节点
     *my_free_list = result -> free_list_link;
     return (result);
   };
@@ -439,6 +443,7 @@ public:
     obj *q = (obj *)p;
     obj * __VOLATILE * my_free_list;
 
+    // n大于128bytes就使用一级分配器,否则使用二级分配器
     if (n > (size_t) __MAX_BYTES) {
         malloc_alloc::deallocate(p, n);
         return;
@@ -449,6 +454,7 @@ public:
         /*REFERENCED*/
         lock lock_instance;
 #       endif /* _NOTHREADS */
+    // 释放的节点挂回内存池
     q -> free_list_link = *my_free_list;
     *my_free_list = q;
     // lock is released here
@@ -530,29 +536,37 @@ __default_alloc_template<threads, inst>::chunk_alloc(size_t size, int& nobjs)
 /* Returns an object of size n, and optionally adds to size n free list.*/
 /* We assume that n is properly aligned.                                */
 /* We hold the allocation lock.                                         */
+// n以上调为8的倍数
+// 在内存池没有空间时,申请一个大小为n的对象
 template <bool threads, int inst>
 void* __default_alloc_template<threads, inst>::refill(size_t n)
 {
     int nobjs = 20;
+    // 调用chunk_alloc()尝试获取nobjs个区块作为free list的新节点
     char * chunk = chunk_alloc(n, nobjs);
     obj * __VOLATILE * my_free_list;
     obj * result;
     obj * current_obj, * next_obj;
     int i;
 
+    // 如果只获得一个区块直接返回,free list无新增节点
     if (1 == nobjs) return(chunk);
+    // 获得大于1个的区块,则放入free list
+    // 获取free_list下标
     my_free_list = free_list + FREELIST_INDEX(n);
 
     /* Build free list in chunk */
-      result = (obj *)chunk;
+      // 在chunk空间内建立free list
+      result = (obj *)chunk;  // 这一块将返回给用户,每块大小为n bytes,所以是chunk+n
       *my_free_list = next_obj = (obj *)(chunk + n);
-      for (i = 1; ; i++) {
+      for (i = 1; ; i++) {  // 从1开始,第0个返回给用户
         current_obj = next_obj;
-        next_obj = (obj *)((char *)next_obj + n);
-        if (nobjs - 1 == i) {
+        next_obj = (obj *)((char *)next_obj + n); // 向后移动n字节
+        if (nobjs - 1 == i) { // 分配完成退出循环
             current_obj -> free_list_link = 0;
             break;
         } else {
+            // 挂上节点
             current_obj -> free_list_link = next_obj;
         }
       }
