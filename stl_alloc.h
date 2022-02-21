@@ -473,27 +473,30 @@ typedef __default_alloc_template<false, 0> single_client_alloc;
 /* the malloc heap too much.                                            */
 /* We assume that size is properly aligned.                             */
 /* We hold the allocation lock.                                         */
+// n已上调为8的倍数
 template <bool threads, int inst>
 char*
 __default_alloc_template<threads, inst>::chunk_alloc(size_t size, int& nobjs)
 {
     char * result;
     size_t total_bytes = size * nobjs;
+    // 内存池中的剩余空间
     size_t bytes_left = end_free - start_free;
 
-    if (bytes_left >= total_bytes) {
+    if (bytes_left >= total_bytes) { // 内存池中的剩余空间满足空间分配需求
         result = start_free;
         start_free += total_bytes;
         return(result);
-    } else if (bytes_left >= size) {
+    } else if (bytes_left >= size) { // 内存池中的剩余空间只能满足一个块大小空间分配需求
         nobjs = bytes_left/size;
         total_bytes = size * nobjs;
         result = start_free;
         start_free += total_bytes;
         return(result);
-    } else {
+    } else {  // 内存池中剩余空间不够分区一个块的大小
         size_t bytes_to_get = 2 * total_bytes + ROUND_UP(heap_size >> 4);
         // Try to make use of the left-over piece.
+        // 充分利用剩余的空间
         if (bytes_left > 0) {
             obj * __VOLATILE * my_free_list =
                         free_list + FREELIST_INDEX(bytes_left);
@@ -501,13 +504,15 @@ __default_alloc_template<threads, inst>::chunk_alloc(size_t size, int& nobjs)
             ((obj *)start_free) -> free_list_link = *my_free_list;
             *my_free_list = (obj *)start_free;
         }
+        // 向使用malloc向系统申请bytes_to_get大小的空间
         start_free = (char *)malloc(bytes_to_get);
-        if (0 == start_free) {
+        if (0 == start_free) {  // malloc失败
             int i;
             obj * __VOLATILE * my_free_list, *p;
             // Try to make do with what we have.  That can't
             // hurt.  We do not try smaller requests, since that tends
             // to result in disaster on multi-process machines.
+            // 遍历内存数组寻找可用的空间
             for (i = size; i <= __MAX_BYTES; i += __ALIGN) {
                 my_free_list = free_list + FREELIST_INDEX(i);
                 p = *my_free_list;
@@ -536,7 +541,7 @@ __default_alloc_template<threads, inst>::chunk_alloc(size_t size, int& nobjs)
 /* Returns an object of size n, and optionally adds to size n free list.*/
 /* We assume that n is properly aligned.                                */
 /* We hold the allocation lock.                                         */
-// n以上调为8的倍数
+// n已上调为8的倍数
 // 在内存池没有空间时,申请一个大小为n的对象
 template <bool threads, int inst>
 void* __default_alloc_template<threads, inst>::refill(size_t n)
