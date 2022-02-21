@@ -316,8 +316,8 @@ typedef malloc_alloc single_client_alloc;
 // different types, limiting the utility of this approach.
 #ifdef __SUNPRO_CC
 // breaks if we make these template class members:
-  enum {__ALIGN = 8};
-  enum {__MAX_BYTES = 128};
+  enum {__ALIGN = 8};   // 内存池上调边界
+  enum {__MAX_BYTES = 128};  // 内存池块的最大值 
   enum {__NFREELISTS = __MAX_BYTES/__ALIGN};
 #endif
 
@@ -332,10 +332,13 @@ private:
     enum {__MAX_BYTES = 128};
     enum {__NFREELISTS = __MAX_BYTES/__ALIGN};
 # endif
+  // ROUND_UP()将bytes上调至8的倍数
   static size_t ROUND_UP(size_t bytes) {
+        // __ALIGN=00001000,__ALIGN-1=00000111,~(__ALIGN-1)=11111000
         return (((bytes) + __ALIGN-1) & ~(__ALIGN - 1));
   }
 __PRIVATE:
+  // free-lists的节点构造
   union obj {
         union obj * free_list_link;
         char client_data[1];    /* The client sees this.        */
@@ -345,20 +348,27 @@ private:
     static obj * __VOLATILE free_list[]; 
         // Specifying a size results in duplicate def for 4.1
 # else
+    // 大小为16的free_list数组
     static obj * __VOLATILE free_list[__NFREELISTS]; 
 # endif
+  // 由区块大小,计算出使用n号free-list
   static  size_t FREELIST_INDEX(size_t bytes) {
+        // 字节对齐到1~8
         return (((bytes) + __ALIGN-1)/__ALIGN - 1);
   }
 
   // Returns an object of size n, and optionally adds to size n free list.
+  // 返回一个大小为n的对象
   static void *refill(size_t n);
   // Allocates a chunk for nobjs of size size.  nobjs may be reduced
   // if it is inconvenient to allocate the requested number.
+  // 分配nobjs*size大小的空间
   static char *chunk_alloc(size_t size, int &nobjs);
 
   // Chunk allocation state.
+  // 内存池起始地址,只在chunk_alloc中变化
   static char *start_free;
+  // 内存池结束地址,只在chunk_alloc中变化
   static char *end_free;
   static size_t heap_size;
 
