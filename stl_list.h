@@ -37,11 +37,13 @@ __STL_BEGIN_NAMESPACE
 #pragma set woff 1174
 #endif
 
+// vector的插入和删除会导致迭代器失效
+// list的插入和删除不会导致迭代器失效
 template <class T>
 struct __list_node {
   typedef void* void_pointer;
   void_pointer next;
-  void_pointer prev;
+  void_pointer prev;  // list是一个环状的双向链表
   T data;
 };
 
@@ -59,7 +61,7 @@ struct __list_iterator {
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
 
-  link_type node;
+  link_type node;  // 迭代器内部有一个普通指针
 
   __list_iterator(link_type x) : node(x) {}
   __list_iterator() {}
@@ -73,10 +75,12 @@ struct __list_iterator {
   pointer operator->() const { return &(operator*()); }
 #endif /* __SGI_STL_NO_ARROW_OPERATOR */
 
+  // 前++不需要参数
   self& operator++() { 
     node = (link_type)((*node).next);
     return *this;
   }
+  // 后++需要参数
   self operator++(int) { 
     self tmp = *this;
     ++*this;
@@ -120,6 +124,7 @@ class list {
 protected:
   typedef void* void_pointer;
   typedef __list_node<T> list_node;
+  // list专属分配器，用于分配一个节点大小的内存空间
   typedef simple_alloc<list_node, Alloc> list_node_allocator;
 public:      
   typedef T value_type;
@@ -148,9 +153,12 @@ public:
 #endif /* __STL_CLASS_PARTIAL_SPECIALIZATION */
 
 protected:
+  // 分配一个节点
   link_type get_node() { return list_node_allocator::allocate(); }
+  // 释放一个节点
   void put_node(link_type p) { list_node_allocator::deallocate(p); }
 
+  // 构造一个带有值的节点
   link_type create_node(const T& x) {
     link_type p = get_node();
     __STL_TRY {
@@ -159,6 +167,7 @@ protected:
     __STL_UNWIND(put_node(p));
     return p;
   }
+  // 销毁一个节点
   void destroy_node(link_type p) {
     destroy(&p->data);
     put_node(p);
@@ -166,8 +175,8 @@ protected:
 
 protected:
   void empty_initialize() { 
-    node = get_node();
-    node->next = node;
+    node = get_node();  // 配置一个节点空间，令node指向它
+    node->next = node;  // 令node头尾都指向自己，不设元素值
     node->prev = node;
   }
 
@@ -209,8 +218,10 @@ protected:
   link_type node;
 
 public:
+  // 产生一个空链
   list() { empty_initialize(); }
 
+  // 环状链表end()的下一个节点是begin()
   iterator begin() { return (link_type)((*node).next); }
   const_iterator begin() const { return (link_type)((*node).next); }
   iterator end() { return node; }
@@ -235,8 +246,10 @@ public:
   reference back() { return *(--end()); }
   const_reference back() const { return *(--end()); }
   void swap(list<T, Alloc>& x) { __STD::swap(node, x.node); }
+  // 在迭代器position所指位置插入一个节点，内容为x
   iterator insert(iterator position, const T& x) {
-    link_type tmp = create_node(x);
+    link_type tmp = create_node(x);  // 生成一个内容为x的节点
+    // 调整双向指针,插入tmp节点
     tmp->next = position.node;
     tmp->prev = position.node->prev;
     (link_type(position.node->prev))->next = tmp;
@@ -259,9 +272,12 @@ public:
   void insert(iterator pos, long n, const T& x) {
     insert(pos, (size_type)n, x);
   }
-
+  
+  // 插入一个节点，作为头节点
   void push_front(const T& x) { insert(begin(), x); }
+  // 插入一个节点，作为尾节点
   void push_back(const T& x) { insert(end(), x); }
+  // 移除迭代器position所指的节点
   iterator erase(iterator position) {
     link_type next_node = link_type(position.node->next);
     link_type prev_node = link_type(position.node->prev);
@@ -273,9 +289,12 @@ public:
   iterator erase(iterator first, iterator last);
   void resize(size_type new_size, const T& x);
   void resize(size_type new_size) { resize(new_size, T()); }
+  // 清除所有节点
   void clear();
 
+  // 移除头节点
   void pop_front() { erase(begin()); }
+  // 移除尾节点
   void pop_back() { 
     iterator tmp = end();
     erase(--tmp);
@@ -307,6 +326,7 @@ public:
   list<T, Alloc>& operator=(const list<T, Alloc>& x);
 
 protected:
+  // 将first,last之间的元素转移到positon位置
   void transfer(iterator position, iterator first, iterator last) {
     if (position != last) {
       (*(link_type((*last.node).prev))).next = position.node;
@@ -429,15 +449,17 @@ void list<T, Alloc>::resize(size_type new_size, const T& x)
     insert(end(), new_size - len, x);
 }
 
+// 清除整个链表
 template <class T, class Alloc> 
 void list<T, Alloc>::clear()
 {
   link_type cur = (link_type) node->next;
-  while (cur != node) {
+  while (cur != node) {  // 遍历每个节点
     link_type tmp = cur;
     cur = (link_type) cur->next;
-    destroy_node(tmp);
+    destroy_node(tmp); // 销毁遍历到的节点
   }
+  // 恢复指针
   node->next = node;
   node->prev = node;
 }
@@ -458,27 +480,29 @@ list<T, Alloc>& list<T, Alloc>::operator=(const list<T, Alloc>& x) {
   return *this;
 }
 
+// 移除指定数值为value的节点
 template <class T, class Alloc>
 void list<T, Alloc>::remove(const T& value) {
   iterator first = begin();
   iterator last = end();
-  while (first != last) {
+  while (first != last) {  // 遍历每一个节点
     iterator next = first;
     ++next;
-    if (*first == value) erase(first);
+    if (*first == value) erase(first);  // 找到就删除
     first = next;
   }
 }
 
+// 移除数值相同的节点,只有连续相同的节点才能删除其中一个
 template <class T, class Alloc>
 void list<T, Alloc>::unique() {
   iterator first = begin();
   iterator last = end();
   if (first == last) return;
   iterator next = first;
-  while (++next != last) {
+  while (++next != last) {  // 遍历每一个节点
     if (*first == *next)
-      erase(next);
+      erase(next);  // 找到就删除
     else
       first = next;
     next = first;
