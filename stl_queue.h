@@ -33,6 +33,7 @@
 
 __STL_BEGIN_NAMESPACE
 
+// queue是以deque作为缺省情况下的地城结构
 #ifndef __STL_LIMITED_DEFAULT_TEMPLATES
 template <class T, class Sequence = deque<T> >
 #else
@@ -49,6 +50,7 @@ public:
 protected:
   Sequence c;
 public:
+  // 完全使用deque的成员函数实现queue的操作
   bool empty() const { return c.empty(); }
   size_type size() const { return c.size(); }
   reference front() { return c.front(); }

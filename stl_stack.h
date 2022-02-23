@@ -33,6 +33,8 @@
 
 __STL_BEGIN_NAMESPACE
 
+// deque是双向开头的数据结构，若以deque为底部结构并封装其头端开口，就形成了stack
+// 因此sgi-stl是以deque作为缺省的stack底部结构
 #ifndef __STL_LIMITED_DEFAULT_TEMPLATES
 template <class T, class Sequence = deque<T> >
 #else
@@ -47,8 +49,9 @@ public:
   typedef typename Sequence::reference reference;
   typedef typename Sequence::const_reference const_reference;
 protected:
-  Sequence c;
+  Sequence c;  // deque类型的底层容器
 public:
+  // 以下完全使用deque中的成员函数来完成stack操作
   bool empty() const { return c.empty(); }
   size_type size() const { return c.size(); }
   reference top() { return c.back(); }
