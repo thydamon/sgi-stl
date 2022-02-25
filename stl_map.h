@@ -37,8 +37,10 @@ __STL_BEGIN_NAMESPACE
 #pragma set woff 1174
 #endif
 
+// map中的所有元素都会根据键值自动排序，map所有元素都是pair键值对，map不允许有两个相同的key
+// map底层使用RB-tree，map不能通过迭代器改变元素的key值，但是具有与list一样的性质可以通过迭代器插入和删除
 #ifndef __STL_LIMITED_DEFAULT_TEMPLATES
-template <class Key, class T, class Compare = less<Key>, class Alloc = alloc>
+template <class Key, class T, class Compare = less<Key>, class Alloc = alloc>  // 缺省采用递增排序
 #else
 template <class Key, class T, class Compare, class Alloc = alloc>
 #endif
@@ -47,10 +49,10 @@ public:
 
 // typedefs:
 
-  typedef Key key_type;
-  typedef T data_type;
+  typedef Key key_type;  // 键值类型
+  typedef T data_type;   // 数据实体类型
   typedef T mapped_type;
-  typedef pair<const Key, T> value_type;
+  typedef pair<const Key, T> value_type;  // 元素类型 key/value
   typedef Compare key_compare;
     
   class value_compare
@@ -68,12 +70,14 @@ public:
 private:
   typedef rb_tree<key_type, value_type, 
                   select1st<value_type>, key_compare, Alloc> rep_type;
+  // 以红黑树作为map的底层实现
   rep_type t;  // red-black tree representing map
 public:
   typedef typename rep_type::pointer pointer;
   typedef typename rep_type::const_pointer const_pointer;
   typedef typename rep_type::reference reference;
   typedef typename rep_type::const_reference const_reference;
+  // 与set不同，不适用const_iterator作为迭代器，因为允许修改元素的value值
   typedef typename rep_type::iterator iterator;
   typedef typename rep_type::const_iterator const_iterator;
   typedef typename rep_type::reverse_iterator reverse_iterator;
@@ -95,6 +99,7 @@ public:
   map(InputIterator first, InputIterator last, const Compare& comp)
     : t(comp) { t.insert_unique(first, last); }
 #else
+  // 与set一样，不允许出现相同的key值
   map(const value_type* first, const value_type* last)
     : t(Compare()) { t.insert_unique(first, last); }
   map(const value_type* first, const value_type* last, const Compare& comp)
