@@ -37,8 +37,11 @@ __STL_BEGIN_NAMESPACE
 #pragma set woff 1174
 #endif
 
+// set中所有元素都会根据元素的键值自动排序，不像map同时拥有key/value
+// set不允许两个相同的元素，set不允许通过迭代器改变set的元素值，但是与list的
+// 性质相同，当对set增删元素时出元素本身，迭代器仍然可用
 #ifndef __STL_LIMITED_DEFAULT_TEMPLATES
-template <class Key, class Compare = less<Key>, class Alloc = alloc>
+template <class Key, class Compare = less<Key>, class Alloc = alloc>  // 缺省情况下采用递增排序
 #else
 template <class Key, class Compare, class Alloc = alloc>
 #endif
@@ -51,6 +54,7 @@ public:
   typedef Compare key_compare;
   typedef Compare value_compare;
 private:
+  // 采用红黑树来实现set
   typedef rb_tree<key_type, value_type, 
                   identity<value_type>, key_compare, Alloc> rep_type;
   rep_type t;  // red-black tree representing set
@@ -59,6 +63,8 @@ public:
   typedef typename rep_type::const_pointer const_pointer;
   typedef typename rep_type::const_reference reference;
   typedef typename rep_type::const_reference const_reference;
+  // ietrator定义为RB-tree的const_iterator，这表示set的迭代器无法执行写入操作
+  // 这是因为set的元素有一定次序安排，不允许用户在任意出进行写入操作
   typedef typename rep_type::const_iterator iterator;
   typedef typename rep_type::const_iterator const_iterator;
   typedef typename rep_type::const_reverse_iterator reverse_iterator;
@@ -67,7 +73,7 @@ public:
   typedef typename rep_type::difference_type difference_type;
 
   // allocation/deallocation
-
+  // set不允许相同键值存在，使用RB-tree中的insert_unique()
   set() : t(Compare()) {}
   explicit set(const Compare& comp) : t(comp) {}
 
@@ -98,7 +104,7 @@ public:
   }
 
   // accessors:
-
+  // 以下所有set操作行为，RB-tree都已提供，set只需调用即可
   key_compare key_comp() const { return t.key_comp(); }
   value_compare value_comp() const { return t.key_comp(); }
   iterator begin() const { return t.begin(); }
