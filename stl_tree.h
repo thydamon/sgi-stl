@@ -61,28 +61,28 @@ iterators invalidated are those referring to the deleted node.
 __STL_BEGIN_NAMESPACE 
 
 typedef bool __rb_tree_color_type;
-const __rb_tree_color_type __rb_tree_red = false;
-const __rb_tree_color_type __rb_tree_black = true;
+const __rb_tree_color_type __rb_tree_red = false;   // 红色为0
+const __rb_tree_color_type __rb_tree_black = true;  // 黑色为1
 
 struct __rb_tree_node_base
 {
   typedef __rb_tree_color_type color_type;
   typedef __rb_tree_node_base* base_ptr;
 
-  color_type color; 
-  base_ptr parent;
-  base_ptr left;
-  base_ptr right;
+  color_type color;   // 节点颜色
+  base_ptr parent;    // RB树的父节点
+  base_ptr left;      // 左孩子
+  base_ptr right;     // 右孩子
 
   static base_ptr minimum(base_ptr x)
   {
-    while (x->left != 0) x = x->left;
+    while (x->left != 0) x = x->left;  // 一直向左走，找到最小节点，这是二叉搜索树的性质
     return x;
   }
 
   static base_ptr maximum(base_ptr x)
   {
-    while (x->right != 0) x = x->right;
+    while (x->right != 0) x = x->right; // 一直往右走，找到最大节点，这是二叉搜索树的性质
     return x;
   }
 };
@@ -91,31 +91,31 @@ template <class Value>
 struct __rb_tree_node : public __rb_tree_node_base
 {
   typedef __rb_tree_node<Value>* link_type;
-  Value value_field;
+  Value value_field;  // 节点值
 };
 
-
+// 基层迭代器
 struct __rb_tree_base_iterator
 {
   typedef __rb_tree_node_base::base_ptr base_ptr;
   typedef bidirectional_iterator_tag iterator_category;
   typedef ptrdiff_t difference_type;
-  base_ptr node;
+  base_ptr node;   // 用来与容器之间产生一个连接关系
 
   void increment()
   {
-    if (node->right != 0) {
-      node = node->right;
-      while (node->left != 0)
-        node = node->left;
+    if (node->right != 0) {        // 如果有右子树
+      node = node->right;          // 一直往右
+      while (node->left != 0)      // 如果有左子树
+        node = node->left;         // 一直往左
     }
-    else {
-      base_ptr y = node->parent;
-      while (node == y->right) {
-        node = y;
+    else {                         // 如果没有右子树
+      base_ptr y = node->parent;   // 找父节点 
+      while (node == y->right) {   // 如果现行节点本身是个右子节点
+        node = y;                  // 一直上溯到不右为止
         y = y->parent;
       }
-      if (node->right != y)
+      if (node->right != y)        // 如果此时的右子节点不等于此时的父节点，此时父节点即为解答，否则node为解答
         node = y;
     }
   }
