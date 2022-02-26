@@ -102,61 +102,103 @@ struct __rb_tree_base_iterator
   typedef ptrdiff_t difference_type;
   base_ptr node;   // 用来与容器之间产生一个连接关系
 
+  // 寻找中序遍历的下一个节点
   void increment()
   {
     if (node->right != 0) {        // 如果有右子树
+      //       X
+      //      / \ 
+      //     O   O
+      //    /\   /\
+      //   O  O T  O   // T即为所找的节点         
       node = node->right;          // 一直往右
       while (node->left != 0)      // 如果有左子树
         node = node->left;         // 一直往左
     }
     else {                         // 如果没有右子树
+  
       base_ptr y = node->parent;   // 找父节点 
       while (node == y->right) {   // 如果现行节点本身是个右子节点
         node = y;                  // 一直上溯到不右为止
         y = y->parent;
       }
+      // 因为根节点和header节点是互为父节点
       if (node->right != y)        // 如果此时的右子节点不等于此时的父节点，此时父节点即为解答，否则node为解答
         node = y;
+      //       T      // T即为所找的节点    
+      //      / \ 
+      //     O   O
+      //    /\   /\
+      //   O  X O  O            
     }
+      //    H        // H为头结点     
+      //    ||  
+      //    T        // T即为所找的节点
+      //    /\   
+      //   O  X               
+
   }
 
+  // 寻找中序遍历的上一个节点
   void decrement()
   {
+    // 如果是红色节点，且父节点的父节点是自己，此种情况仅发生在header节点
     if (node->color == __rb_tree_red &&
         node->parent->parent == node)
+      //    X        // X为头结点,头结点为当前结点     
+      //    ||  
+      //    T        // T即为根节点，根节点即为所找的节点
+      //    /\   
+      //   O  O               
       node = node->right;
-    else if (node->left != 0) {
-      base_ptr y = node->left;
-      while (y->right != 0)
-        y = y->right;
-      node = y;
+    else if (node->left != 0) {  // 有左孩子
+      base_ptr y = node->left;   // 一直向左
+      while (y->right != 0)      // 有右孩子
+        y = y->right;            // 一直右走到底
+      node = y;                  // 最后即为解答
+      //       X         
+      //      / \ 
+      //     O   O
+      //    /\   /\
+      //   O  T O  O  // T即为所找的节点           
     }
-    else {
-      base_ptr y = node->parent;
-      while (node == y->left) {
-        node = y;
-        y = y->parent;
+    else {  // 非根节点且没有左孩子
+      base_ptr y = node->parent;     // 找父节点
+      while (node == y->left) {      // 如果node为父节点的左孩子
+        node = y;                    // 一直上溯
+        y = y->parent;               // 直到不左为止
       }
       node = y;
+      //     T        // T即为所找的节点  
+      //    / \
+      //   O   O         
+      //      / \ 
+      //     O   O
+      //    /\   /\
+      //   X  O O  O           
     }
   }
 };
 
+// 继承自基类迭代器_rb_tree_base_iterator
 template <class Value, class Ref, class Ptr>
 struct __rb_tree_iterator : public __rb_tree_base_iterator
 {
+  // 迭代器的内嵌类型
   typedef Value value_type;
   typedef Ref reference;
   typedef Ptr pointer;
   typedef __rb_tree_iterator<Value, Value&, Value*>             iterator;
   typedef __rb_tree_iterator<Value, const Value&, const Value*> const_iterator;
   typedef __rb_tree_iterator<Value, Ref, Ptr>                   self;
-  typedef __rb_tree_node<Value>* link_type;
+  typedef __rb_tree_node<Value>* link_type;   // 节点指针
 
+  // 构造函数
   __rb_tree_iterator() {}
   __rb_tree_iterator(link_type x) { node = x; }
   __rb_tree_iterator(const iterator& it) { node = it.node; }
 
+  // 运算符重载
   reference operator*() const { return link_type(node)->value_field; }
 #ifndef __SGI_STL_NO_ARROW_OPERATOR
   pointer operator->() const { return &(operator*()); }
@@ -177,11 +219,13 @@ struct __rb_tree_iterator : public __rb_tree_base_iterator
   }
 };
 
+// 两个迭代器相等，意味着指向RB-tree的同一个节点
 inline bool operator==(const __rb_tree_base_iterator& x,
                        const __rb_tree_base_iterator& y) {
   return x.node == y.node;
 }
 
+// 两个迭代器不相等，意味着指向RB-tree的不同一个节点
 inline bool operator!=(const __rb_tree_base_iterator& x,
                        const __rb_tree_base_iterator& y) {
   return x.node != y.node;
@@ -206,25 +250,33 @@ inline Value* value_type(const __rb_tree_iterator<Value, Ref, Ptr>&) {
 
 #endif /* __STL_CLASS_PARTIAL_SPECIALIZATION */
 
+// 新节点必须为红色节点，如果安插处的父节点为红色，违反了红黑树的规则
+// 需要旋转和改变颜色
+// 左旋转操作
+// 节点x为左旋转点
 inline void 
 __rb_tree_rotate_left(__rb_tree_node_base* x, __rb_tree_node_base*& root)
 {
-  __rb_tree_node_base* y = x->right;
-  x->right = y->left;
+  __rb_tree_node_base* y = x->right;  // 获取左旋转节点x的右孩子y
+  x->right = y->left;                 // 把y节点的左孩子作为旋转节点x的右孩子
   if (y->left !=0)
-    y->left->parent = x;
-  y->parent = x->parent;
+    y->left->parent = x;              // 更新节点y左孩子父节点指针，指向新的父节点x
+  y->parent = x->parent;              // y节点替换x节点的位置
 
-  if (x == root)
-    root = y;
+  // 令y完全顶替x的地位
+  if (x == root)                      // 若原始位置节点x是根节点
+    root = y;                         // 则y为新的根节点
+  // 否则，若x节点是其父节点的左孩子
   else if (x == x->parent->left)
-    x->parent->left = y;
-  else
-    x->parent->right = y;
-  y->left = x;
-  x->parent = y;
+    x->parent->left = y;              // 则更新节点y为原始x父节点的左孩子
+  else                                // 若x节点是其父节点的右孩子
+    x->parent->right = y;             // 则更新新节点y为原始父节点的右孩子
+  y->left = x;                        // 旋转后旋转x作为节点y的左孩子
+  x->parent = y;                      // 更新x节点的父节点
 }
 
+// 右旋转
+// 节点x为右旋转节点
 inline void 
 __rb_tree_rotate_right(__rb_tree_node_base* x, __rb_tree_node_base*& root)
 {
@@ -244,6 +296,8 @@ __rb_tree_rotate_right(__rb_tree_node_base* x, __rb_tree_node_base*& root)
   x->parent = y;
 }
 
+//重新令RB-tree平衡（改变颜色和旋转）
+//参数一为新增节点x，参数二为root节点
 inline void 
 __rb_tree_rebalance(__rb_tree_node_base* x, __rb_tree_node_base*& root)
 {
